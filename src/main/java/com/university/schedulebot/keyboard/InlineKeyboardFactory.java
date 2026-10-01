@@ -6,6 +6,7 @@ import com.university.schedulebot.entity.Lesson;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import com.university.schedulebot.entity.User;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,34 @@ public class InlineKeyboardFactory {
     public static final String CB_EDIT_PREFIX   = "EDIT:";
     public static final String CB_DELETE_CONFIRM = "DELETE:CONFIRM";
     public static final String CB_DELETE_ABORT   = "DELETE:ABORT";
+    public static final String CB_STUDENTS_GROUP_PREFIX = "STUDENTS_GROUP:";
+    public static final String CB_APPROVE_STUDENT_PREFIX = "APPROVE_STUDENT:";
+
+
+    public InlineKeyboardMarkup studentsGroups(List<Group> groups) {
+        List<InlineKeyboardButton> buttons = groups.stream()
+                .map(g -> btn(g.getName(), CB_STUDENTS_GROUP_PREFIX + g.getId()))
+                .toList();
+        return grid(buttons, 2);
+    }
+
+    public InlineKeyboardMarkup pendingStudents(List<User> students) {
+        List<InlineKeyboardButton> buttons = students.stream()
+                .map(user -> btn(
+                        "✅ " + (user.getFullName() == null
+                                ? "Студент #" + user.getId()
+                                : user.getFullName()),
+                        CB_APPROVE_STUDENT_PREFIX + user.getId()))
+                .toList();
+        return grid(buttons, 1);
+    }
+
+    public InlineKeyboardMarkup groupsToDelete(List<Group> groups) {
+        List<InlineKeyboardButton> buttons = groups.stream()
+                .map(g -> btn("🗑 " + g.getName(), "DELETE_GROUP:" + g.getId()))
+                .toList();
+        return grid(buttons, 1);
+    }
 
     public InlineKeyboardMarkup roleSelection() {
         return oneColumn(List.of(

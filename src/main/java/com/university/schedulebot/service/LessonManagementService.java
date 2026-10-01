@@ -99,7 +99,7 @@ public class LessonManagementService {
                 .build());
 
         return BotResponse.text(author.getChatId(),
-                "✅ Занятие создано (#" + lesson.getId() + "):\n" + scheduleService.renderLesson(lesson));
+                "✅ Занятие создано:\n" + scheduleService.renderLesson(lesson));
     }
 
     /** Формат: /editlesson <id> | поле=значение; ... (title, date, start, end, room) */
@@ -208,9 +208,10 @@ public class LessonManagementService {
             return BotResponse.text(author.getChatId(), "У вас нет занятий на ближайший месяц.");
         }
         StringBuilder sb = new StringBuilder("✏️ *Ваши занятия (30 дней)*\n\n");
-        list.forEach(l -> sb.append("#").append(l.getId()).append(' ')
-                .append(l.getLessonDate().format(ScheduleService.DATE_FMT)).append(' ')
-                .append(scheduleService.renderLesson(l)).append('\n'));
+        list.forEach(l -> sb.append(l.getLessonDate().format(ScheduleService.DATE_FMT))
+                .append(' ')
+                .append(scheduleService.renderLesson(l))
+                .append('\n'));
 
         return BotResponse.of(author.getChatId(), sb.toString(), inlineKeyboards.lessonActions(list));
     }

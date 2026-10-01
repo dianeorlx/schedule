@@ -40,6 +40,11 @@ public class RegistrationService {
                     "✅ Вы уже зарегистрированы. Чтобы изменить данные, используйте /delete_me и зарегистрируйтесь заново.",
                     menuFor(user));
         }
+        if (user.getRegistrationState() == RegistrationState.PENDING_APPROVAL) {
+            return BotResponse.of(request.getChatId(),
+                    "🕓 Ваша регистрация уже ожидает подтверждения преподавателем.",
+                    replyKeyboards.guestMenu());
+        }
         user.setRegistrationState(RegistrationState.AWAITING_ROLE);
         user.setUsername(request.getUsername());
         user.setFullName(request.getFullName());
@@ -150,6 +155,16 @@ public class RegistrationService {
         User user = found.get();
         user.setLocation(request.getText().trim());
         user.setZoneId(zone.get().getId());
+        if (user.isStudent()) {
+            user.setRegistrationState(RegistrationState.PENDING_APPROVAL);
+            userService.save(user);
+
+            return BotResponse.of(request.getChatId(),
+                    "🕓 Данные отправлены преподавателю на подтверждение. "
+                            + "После подтверждения вам станет доступно расписание.",
+                    replyKeyboards.guestMenu());
+        }
+
         user.setRegistrationState(RegistrationState.COMPLETED);
         user.setRegisteredAt(LocalDateTime.now(clock));
         userService.save(user);

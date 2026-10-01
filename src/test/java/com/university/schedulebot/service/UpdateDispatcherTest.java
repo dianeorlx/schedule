@@ -63,6 +63,9 @@ class UpdateDispatcherTest {
 
     private UpdateDispatcher dispatcher;
 
+    @Mock
+    private TeacherManagementService teacherManagementService;
+
     @BeforeEach
     void setUp() {
         dispatcher = new UpdateDispatcher(
@@ -72,7 +75,8 @@ class UpdateDispatcherTest {
                 scheduleService,
                 lessonService,
                 dateParser,
-                inlineKeyboards
+                inlineKeyboards,
+                teacherManagementService
         );
     }
 

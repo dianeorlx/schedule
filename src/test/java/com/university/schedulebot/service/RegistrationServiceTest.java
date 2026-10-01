@@ -26,10 +26,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
@@ -554,14 +551,12 @@ class RegistrationServiceTest {
     }
 
     @Test
-    void handleLocationShouldCompleteStudentRegistration() {
+    void handleLocationShouldSetStudentPendingApproval() {
         UserRequest request = request();
         request.setText("Москва");
 
         User user = new User();
-        user.setRegistrationState(
-                RegistrationState.AWAITING_LOCATION
-        );
+        user.setRegistrationState(RegistrationState.AWAITING_LOCATION);
         user.setRole(studentRole());
 
         Group group = new Group();
@@ -576,81 +571,24 @@ class RegistrationServiceTest {
         when(timeZoneService.resolve("Москва"))
                 .thenReturn(Optional.of(moscow));
 
-        when(timeZoneService.offsetLabel(
-                "Europe/Moscow",
-                clock
-        )).thenReturn("UTC+03:00");
-
-        when(replyKeyboards.studentMenu())
+        when(replyKeyboards.guestMenu())
                 .thenReturn(new ReplyKeyboardMarkup());
 
-        BotResponse response =
-                registrationService.handleLocation(request);
+        BotResponse response = registrationService.handleLocation(request);
 
         assertNotNull(response);
         assertEquals("Москва", user.getLocation());
         assertEquals("Europe/Moscow", user.getZoneId());
         assertEquals(
-                RegistrationState.COMPLETED,
+                RegistrationState.PENDING_APPROVAL,
                 user.getRegistrationState()
         );
-        assertEquals(
-                LocalDateTime.of(2024, 1, 1, 12, 0),
-                user.getRegisteredAt()
-        );
+        assertNull(user.getRegisteredAt());
+        assertTrue(response.getText().contains("подтверждение"));
 
         verify(userService).save(user);
-        verify(replyKeyboards).studentMenu();
-    }
-
-    @Test
-    void handleLocationShouldCompleteTeacherRegistration() {
-        UserRequest request = request();
-        request.setText("Москва");
-
-        User user = new User();
-        user.setRegistrationState(
-                RegistrationState.AWAITING_LOCATION
-        );
-        user.setRole(teacherRole());
-
-        Department department = new Department();
-        department.setName("Кафедра информатики");
-        user.setDepartment(department);
-
-        ZoneId moscow = ZoneId.of("Europe/Moscow");
-
-        when(userService.find(request.getChatId()))
-                .thenReturn(Optional.of(user));
-
-        when(timeZoneService.resolve("Москва"))
-                .thenReturn(Optional.of(moscow));
-
-        when(timeZoneService.offsetLabel(
-                "Europe/Moscow",
-                clock
-        )).thenReturn("UTC+03:00");
-
-        when(replyKeyboards.teacherMenu())
-                .thenReturn(new ReplyKeyboardMarkup());
-
-        BotResponse response =
-                registrationService.handleLocation(request);
-
-        assertNotNull(response);
-        assertEquals("Москва", user.getLocation());
-        assertEquals("Europe/Moscow", user.getZoneId());
-        assertEquals(
-                RegistrationState.COMPLETED,
-                user.getRegistrationState()
-        );
-        assertEquals(
-                LocalDateTime.of(2024, 1, 1, 12, 0),
-                user.getRegisteredAt()
-        );
-
-        verify(userService).save(user);
-        verify(replyKeyboards).teacherMenu();
+        verify(replyKeyboards).guestMenu();
+        verify(replyKeyboards, never()).studentMenu();
     }
 
     @Test

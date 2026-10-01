@@ -2,6 +2,7 @@ package com.university.schedulebot.service;
 
 import com.university.schedulebot.dto.BotResponse;
 import com.university.schedulebot.dto.UserRequest;
+import com.university.schedulebot.entity.RegistrationState;
 import com.university.schedulebot.entity.User;
 import com.university.schedulebot.keyboard.InlineKeyboardFactory;
 import com.university.schedulebot.keyboard.ReplyKeyboardFactory;
@@ -22,6 +23,7 @@ public class UpdateDispatcher {
     private final LessonManagementService lessonService;
     private final DateParserService dateParser;
     private final InlineKeyboardFactory inlineKeyboards;
+    private final TeacherManagementService teacherManagementService;
 
     public BotResponse dispatch(UserRequest request) {
         return request.isCallback() ? handleCallback(request) : handleText(request);
@@ -36,6 +38,11 @@ public class UpdateDispatcher {
         if (user.isPresent() && registrationService.isAwaitingInput(user.get())
                 && !text.startsWith("/")) {
             return registrationService.handleLocation(request);
+        }
+        if (user.isPresent()
+                && user.get().getRegistrationState() == RegistrationState.AWAITING_GROUP_NAME
+                && !text.startsWith("/")) {
+            return teacherManagementService.createGroup(user.get(), text);
         }
 
         String command = text.split("\\s+")[0].toLowerCase();
@@ -57,6 +64,18 @@ public class UpdateDispatcher {
             case "/delete_me"  -> BotResponse.of(chatId,
                     "⚠️ Все ваши данные (профиль, занятия) будут удалены безвозвратно. Продолжить?",
                     inlineKeyboards.deleteConfirmation());
+            case "/students" -> requireUser(chatId, user,
+                    teacherManagementService::groupsWithStudents);
+
+            case "/pending_students" -> requireUser(chatId, user,
+                    teacherManagementService::pendingStudents);
+
+            case "/group_add" -> requireTeacher(chatId, user,
+                    teacherManagementService::promptCreateGroup);
+
+            case "/group_delete" -> requireUser(chatId, user,
+                    teacherManagementService::groupsForDeletion);
+
             default -> commandService.unknown(chatId, user);
         };
     }
@@ -73,6 +92,10 @@ public class UpdateDispatcher {
             case ReplyKeyboardFactory.BTN_DELETE -> "/delete_me";
             case ReplyKeyboardFactory.BTN_ADD_LESSON -> "/addlesson";
             case ReplyKeyboardFactory.BTN_MANAGE_LESSON -> "/mylessons";
+            case ReplyKeyboardFactory.BTN_STUDENTS -> "/students";
+            case ReplyKeyboardFactory.BTN_PENDING_STUDENTS -> "/pending_students";
+            case ReplyKeyboardFactory.BTN_CREATE_GROUP -> "/group_add";
+            case ReplyKeyboardFactory.BTN_DELETE_GROUP -> "/group_delete";
             default -> command;
         };
     }
@@ -116,7 +139,38 @@ public class UpdateDispatcher {
         if (InlineKeyboardFactory.CB_DELETE_ABORT.equals(data)) {
             return BotResponse.of(chatId, "✅ Удаление отменено.", commandService.menuFor(user));
         }
+        if (data.startsWith(InlineKeyboardFactory.CB_STUDENTS_GROUP_PREFIX)) {
+            Long groupId = Long.parseLong(
+                    data.substring(InlineKeyboardFactory.CB_STUDENTS_GROUP_PREFIX.length()));
+            return requireTeacher(chatId, user,
+                    u -> teacherManagementService.studentsInGroup(u, groupId));
+        }
+
+        if (data.startsWith(InlineKeyboardFactory.CB_APPROVE_STUDENT_PREFIX)) {
+            Long studentId = Long.parseLong(
+                    data.substring(InlineKeyboardFactory.CB_APPROVE_STUDENT_PREFIX.length()));
+            return requireTeacher(chatId, user,
+                    u -> teacherManagementService.approveStudent(u, studentId));
+        }
+
+        if (data.startsWith("DELETE_GROUP:")) {
+            Long groupId = Long.parseLong(data.substring("DELETE_GROUP:".length()));
+            return requireTeacher(chatId, user,
+                    u -> teacherManagementService.deleteGroup(u, groupId));
+        }
+
         return BotResponse.text(chatId, "⚠️ Неизвестное действие.");
+    }
+
+    private BotResponse requireTeacher(
+            Long chatId,
+            Optional<User> user,
+            java.util.function.Function<User, BotResponse> action) {
+        if (user.isEmpty() || !user.get().isRegistered() || !user.get().isTeacher()) {
+            return BotResponse.text(chatId,
+                    "⛔ Это действие доступно только зарегистрированному преподавателю.");
+        }
+        return action.apply(user.get());
     }
 
     private BotResponse schedule(User user, String args) {
